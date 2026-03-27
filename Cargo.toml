@@ -2,10 +2,10 @@
 name = "edges"
 version = "0.1.0"
 edition = "2021"
-authors = ["Your Name <you@example.com>"]
+authors = ["Pablo Punk"]
 description = "Lightweight window borders for macOS"
 license = "MIT"
-repository = "https://github.com/yourusername/edges"
+repository = "https://github.com/pablopunk/edges"
 keywords = ["macos", "window-manager", "borders", "tiling"]
 categories = ["os::macos-apis"]
 

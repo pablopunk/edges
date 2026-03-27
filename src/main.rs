@@ -44,6 +44,25 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
     let mut settings = Settings::default();
 
+    // Load config file: --config path, or ~/.config/edges/edges.toml
+    let config_path = cli.config.clone().unwrap_or_else(|| {
+        let home = std::env::var("HOME").unwrap_or_default();
+        std::path::PathBuf::from(format!("{}/.config/edges/edges.toml", home))
+    });
+    if config_path.exists() {
+        match std::fs::read_to_string(&config_path) {
+            Ok(content) => match toml::from_str::<settings::ConfigFile>(&content) {
+                Ok(cfg) => {
+                    cfg.apply(&mut settings);
+                    info!(?config_path, "Loaded config file");
+                }
+                Err(e) => warn!(?config_path, error = %e, "Failed to parse config"),
+            },
+            Err(e) => warn!(?config_path, error = %e, "Failed to read config"),
+        }
+    }
+
+    // CLI args override config file
     if let Some(style) = cli.style {
         settings.style = match style.as_str() {
             "round"   => settings::BorderStyle::Round,
@@ -55,12 +74,12 @@ fn main() -> Result<()> {
     if let Some(w) = cli.width { settings.width = w; }
     if cli.hidpi { settings.hidpi = true; }
     if let Some(ref c) = cli.active_color {
-        if let Some(hex) = parse_color(c) {
+        if let Some(hex) = settings::parse_hex(c) {
             settings.colors.active = settings::ColorSpec::Solid { color: hex };
         }
     }
     if let Some(ref c) = cli.inactive_color {
-        if let Some(hex) = parse_color(c) {
+        if let Some(hex) = settings::parse_hex(c) {
             settings.colors.inactive = settings::ColorSpec::Solid { color: hex };
         }
     }
@@ -91,11 +110,6 @@ fn main() -> Result<()> {
     }
 
     Ok(())
-}
-
-fn parse_color(s: &str) -> Option<u32> {
-    let s = s.trim_start_matches("0x").trim_start_matches("0X");
-    u32::from_str_radix(s, 16).ok()
 }
 
 fn handle_event(wm: &mut WindowManager, event: WindowEvent) {

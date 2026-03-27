@@ -117,6 +117,61 @@ impl Settings {
     }
 }
 
+/// Config file format for ~/.config/edges/edges.toml
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct ConfigFile {
+    pub style: Option<String>,
+    pub width: Option<f32>,
+    pub hidpi: Option<bool>,
+    pub active_color: Option<String>,
+    pub inactive_color: Option<String>,
+    pub order: Option<String>,
+}
+
+impl Default for ConfigFile {
+    fn default() -> Self {
+        Self { style: None, width: None, hidpi: None, active_color: None, inactive_color: None, order: None }
+    }
+}
+
+pub fn parse_hex(s: &str) -> Option<u32> {
+    let s = s.trim_start_matches("0x").trim_start_matches("0X");
+    u32::from_str_radix(s, 16).ok()
+}
+
+impl ConfigFile {
+    pub fn apply(&self, settings: &mut Settings) {
+        if let Some(ref s) = self.style {
+            settings.style = match s.as_str() {
+                "round" => BorderStyle::Round,
+                "square" => BorderStyle::Square,
+                "uniform" => BorderStyle::Uniform,
+                _ => settings.style,
+            };
+        }
+        if let Some(w) = self.width { settings.width = w; }
+        if let Some(h) = self.hidpi { settings.hidpi = h; }
+        if let Some(ref c) = self.active_color {
+            if let Some(hex) = parse_hex(c) {
+                settings.colors.active = ColorSpec::Solid { color: hex };
+            }
+        }
+        if let Some(ref c) = self.inactive_color {
+            if let Some(hex) = parse_hex(c) {
+                settings.colors.inactive = ColorSpec::Solid { color: hex };
+            }
+        }
+        if let Some(ref o) = self.order {
+            settings.border_order = match o.as_str() {
+                "above" => BorderOrder::Above,
+                "below" => BorderOrder::Below,
+                _ => settings.border_order,
+            };
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

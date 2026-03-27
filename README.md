@@ -16,18 +16,32 @@ brew services start edges
 
 # Or run directly
 edges
-
-# Custom width and colors (ARGB hex)
-edges --width 6.0 --active-color 0xffe2e2e3 --inactive-color 0xff414550
-
-# Square corners
-edges --style square
-
-# HiDPI mode (2x resolution)
-edges --hidpi
 ```
 
-### Options
+### Configuration
+
+Create `~/.config/edges/edges.toml`:
+
+```toml
+style = "round"
+width = 6.0
+active_color = "0xffe2e2e3"
+inactive_color = "0xff414550"
+# order = "below"
+# hidpi = false
+```
+
+Changes take effect after restarting: `brew services restart edges`
+
+### CLI options
+
+CLI args override the config file:
+
+```bash
+edges --width 6.0 --active-color 0xffe2e2e3 --inactive-color 0xff414550
+edges --style square
+edges --hidpi
+```
 
 | Flag | Description | Default |
 |------|-------------|---------|
@@ -36,13 +50,14 @@ edges --hidpi
 | `--active-color <HEX>` | Focused window border (ARGB) | `0xffe1e3e4` |
 | `--inactive-color <HEX>` | Unfocused window border (ARGB) | `0x00000000` |
 | `--hidpi` | Enable HiDPI rendering | off |
+| `--config <PATH>` | Config file path | `~/.config/edges/edges.toml` |
 
 ### Service management
 
 ```bash
 brew services start edges   # start and enable at login
 brew services stop edges    # stop
-brew services restart edges # restart
+brew services restart edges # restart after config changes
 ```
 
 ## Requirements
