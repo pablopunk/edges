@@ -389,16 +389,24 @@ impl WindowManager {
         }
     }
 
-    /// Get active space ID for the main display
+    /// Get active space ID — uses the active menu bar display (correct for multi-monitor).
+    /// Matches JB get_active_space_id from space.h.
     fn get_active_space_id(&self) -> SpaceID {
         unsafe {
-            let displays = SLSCopyManagedDisplays(self.cid);
-            if displays.is_null() { return 0; }
-            let count = cf::cfarray_count(displays);
-            if count == 0 { cf::CFRelease(displays as CFTypeRef); return 0; }
-            let display_uuid = cf::cfarray_get(displays, 0);
-            let sid = SLSManagedDisplayGetCurrentSpace(self.cid, display_uuid as _);
-            cf::CFRelease(displays as CFTypeRef);
+            let uuid_ref = SLSCopyActiveMenuBarDisplayIdentifier(self.cid);
+            if uuid_ref.is_null() {
+                // Fallback: single display
+                let displays = SLSCopyManagedDisplays(self.cid);
+                if displays.is_null() { return 0; }
+                let count = cf::cfarray_count(displays);
+                if count == 0 { cf::CFRelease(displays as CFTypeRef); return 0; }
+                let uuid = cf::cfarray_get(displays, 0);
+                let sid = SLSManagedDisplayGetCurrentSpace(self.cid, uuid as _);
+                cf::CFRelease(displays as CFTypeRef);
+                return sid;
+            }
+            let sid = SLSManagedDisplayGetCurrentSpace(self.cid, uuid_ref);
+            cf::CFRelease(uuid_ref as CFTypeRef);
             sid
         }
     }

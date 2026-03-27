@@ -127,6 +127,7 @@ extern "C" {
     );
 
     pub fn SLSCopyManagedDisplays(cid: ConnectionID) -> CFArrayRef;
+    pub fn SLSCopyActiveMenuBarDisplayIdentifier(cid: ConnectionID) -> CFStringRef;
     pub fn SLSCopyManagedDisplaySpaces(cid: ConnectionID) -> CFArrayRef;
 
     pub fn SLSDisableUpdate(cid: ConnectionID);
