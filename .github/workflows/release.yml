@@ -1,0 +1,139 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  release:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute CalVer tag
+        id: version
+        run: |
+          today=$(date -u +%Y.%m.%d)
+          # Find existing tags for today and pick next number
+          n=1
+          while git rev-parse "v${today}.${n}" >/dev/null 2>&1; do
+            n=$((n + 1))
+          done
+          echo "version=${today}.${n}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${today}.${n}" >> "$GITHUB_OUTPUT"
+
+      - name: Install Rust targets
+        run: |
+          rustup target add aarch64-apple-darwin
+          rustup target add x86_64-apple-darwin
+
+      - name: Set version in Cargo.toml
+        run: sed -i '' "s/^version = .*/version = \"${{ steps.version.outputs.version }}\"/" Cargo.toml
+
+      - name: Build aarch64
+        run: cargo build --release --target aarch64-apple-darwin
+
+      - name: Build x86_64
+        run: cargo build --release --target x86_64-apple-darwin
+
+      - name: Package binaries
+        run: |
+          mkdir -p dist
+          cp target/aarch64-apple-darwin/release/edges dist/edges-aarch64
+          cp target/x86_64-apple-darwin/release/edges dist/edges-x86_64
+          cd dist
+          tar czf edges-${{ steps.version.outputs.version }}-aarch64.tar.gz edges-aarch64
+          tar czf edges-${{ steps.version.outputs.version }}-x86_64.tar.gz edges-x86_64
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${{ steps.version.outputs.tag }}"
+          version="${{ steps.version.outputs.version }}"
+          git tag "$tag"
+          git push origin "$tag"
+          gh release create "$tag" \
+            dist/edges-${version}-aarch64.tar.gz \
+            dist/edges-${version}-x86_64.tar.gz \
+            --title "v${version}" \
+            --generate-notes
+
+      - name: Update Homebrew formula
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          
+          # Get SHA256 of tarballs
+          sha_arm=$(shasum -a 256 dist/edges-${version}-aarch64.tar.gz | awk '{print $1}')
+          sha_intel=$(shasum -a 256 dist/edges-${version}-x86_64.tar.gz | awk '{print $1}')
+          
+          base_url="https://github.com/pablopunk/edges/releases/download/v${version}"
+          
+          cat > /tmp/edges.rb << FORMULA
+          class Edges < Formula
+            desc "A lightweight window border tool for macOS"
+            homepage "https://github.com/pablopunk/edges"
+            license "MIT"
+            version "${version}"
+          
+            on_arm do
+              url "${base_url}/edges-${version}-aarch64.tar.gz"
+              sha256 "${sha_arm}"
+            end
+          
+            on_intel do
+              url "${base_url}/edges-${version}-x86_64.tar.gz"
+              sha256 "${sha_intel}"
+            end
+          
+            depends_on :macos
+          
+            head "https://github.com/pablopunk/edges.git", branch: "main"
+            head do
+              depends_on "rust" => :build
+            end
+          
+            def install
+              if build.head?
+                system "cargo", "build", "--release"
+                bin.install "target/release/edges"
+              else
+                if Hardware::CPU.arm?
+                  bin.install "edges-aarch64" => "edges"
+                else
+                  bin.install "edges-x86_64" => "edges"
+                end
+              end
+            end
+          
+            service do
+              run "#{opt_bin}/edges"
+              environment_variables PATH: std_service_path_env, LANG: "en_US.UTF-8"
+              keep_alive true
+              process_type :interactive
+              log_path "#{var}/log/edges/edges.out.log"
+              error_log_path "#{var}/log/edges/edges.err.log"
+            end
+          
+            test do
+              assert_match "edges", shell_output("#{bin}/edges --version")
+            end
+          end
+          FORMULA
+          
+          # Remove leading whitespace from heredoc
+          sed -i '' 's/^          //' /tmp/edges.rb
+          
+          # Clone and update homebrew-brew
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/pablopunk/homebrew-brew.git" /tmp/homebrew-brew
+          cp /tmp/edges.rb /tmp/homebrew-brew/edges.rb
+          cd /tmp/homebrew-brew
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add edges.rb
+          git commit -m "edges: update to ${version}"
+          git push
