@@ -5,7 +5,7 @@ A lightweight window border tool for macOS, written in Rust. Inspired by [JankyB
 ## Install
 
 ```bash
-brew install --HEAD pablopunk/brew/edges
+brew install pablopunk/brew/edges
 ```
 
 ## Usage
