@@ -59,11 +59,20 @@ jobs:
           version="${{ steps.version.outputs.version }}"
           git tag "$tag"
           git push origin "$tag"
+          
+          # Generate changelog from commits since last tag
+          prev_tag=$(git tag --sort=-v:refname | grep -v "^${tag}$" | head -1)
+          if [ -n "$prev_tag" ]; then
+            changelog=$(git log "${prev_tag}..HEAD" --pretty=format:"- %s (%h)" --no-merges)
+          else
+            changelog=$(git log --pretty=format:"- %s (%h)" --no-merges -20)
+          fi
+          
           gh release create "$tag" \
             dist/edges-${version}-aarch64.tar.gz \
             dist/edges-${version}-x86_64.tar.gz \
             --title "v${version}" \
-            --generate-notes
+            --notes "$changelog"
 
       - name: Update Homebrew formula
         env:
