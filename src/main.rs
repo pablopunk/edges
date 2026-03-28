@@ -15,7 +15,7 @@ use settings::Settings;
 use window_manager::WindowManager;
 
 #[derive(Parser, Debug)]
-#[command(name = "edges", about = "Lightweight window borders for macOS", version)]
+#[command(name = "edges", about = "Lightweight window borders for macOS", version = option_env!("EDGES_VERSION").unwrap_or(env!("CARGO_PKG_VERSION")))]
 struct Cli {
     #[arg(short, long)]
     config: Option<std::path::PathBuf>,

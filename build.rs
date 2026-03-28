@@ -1,4 +1,10 @@
 fn main() {
+    // Pass EDGES_VERSION to the binary at compile time
+    if let Ok(v) = std::env::var("EDGES_VERSION") {
+        println!("cargo:rustc-env=EDGES_VERSION={}", v);
+    }
+    println!("cargo:rerun-if-env-changed=EDGES_VERSION");
+
     // Link frameworks - matching JankyBorders exactly
     println!("cargo:rustc-link-lib=framework=SkyLight");
     println!("cargo:rustc-link-lib=framework=AppKit");
