@@ -2,6 +2,8 @@
 
 A lightweight window border tool for macOS, written in Rust. Inspired by [JankyBorders](https://github.com/FelixKratz/JankyBorders).
 
+![screenshot](https://github.com/user-attachments/assets/b3980755-f3bb-46b8-8c66-7d842cac02c5)
+
 ## Install
 
 ```bash
