@@ -195,6 +195,21 @@ impl BorderWindow {
         unsafe { SLSGetWindowOwner(self.cid, self.target_wid, &mut owner) == 0 }
     }
 
+    /// Get the space ID this border is on
+    pub fn sid(&self) -> SpaceID { self.sid }
+
+    /// Move the border window to a new space
+    pub fn move_to_space(&mut self, new_sid: SpaceID) {
+        if new_sid == 0 || new_sid == self.sid { return; }
+        self.sid = new_sid;
+        unsafe {
+            let arr = cf::cfarray_of_u32(&[self.wid]);
+            SLSMoveWindowsToManagedSpace(self.cid, arr, new_sid);
+            cf::CFRelease(arr as CFTypeRef);
+        }
+        self.needs_redraw = true;
+    }
+
     /// Full update — matches JB border_update_internal.
     pub fn update(&mut self) -> Result<()> {
         let cid = self.cid;

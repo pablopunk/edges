@@ -173,6 +173,9 @@ impl WindowManager {
         let current_spaces = self.get_current_space_ids();
         if current_spaces.is_empty() { return; }
 
+        // Collect windows visible on current spaces
+        let mut seen_wids = std::collections::HashSet::new();
+
         unsafe {
             let space_arr = cf::cfarray_of_u64(&current_spaces);
             let set_tags: u64 = 1;
@@ -189,7 +192,13 @@ impl WindowManager {
                         while SLSWindowIteratorAdvance(iter) {
                             if self.iterator_window_suitable(iter) {
                                 let wid = SLSWindowIteratorGetWindowID(iter);
+                                seen_wids.insert(wid);
+                                let target_sid = self.window_space_id(wid);
                                 if let Some(border) = self.borders.get_mut(&wid) {
+                                    // Move border to target's current space if it changed
+                                    if target_sid != 0 && target_sid != border.sid() {
+                                        border.move_to_space(target_sid);
+                                    }
                                     let _ = border.update();
                                 } else {
                                     debug!(wid, "Creating missing window on space change");
@@ -205,6 +214,20 @@ impl WindowManager {
                 cf::CFRelease(window_list as CFTypeRef);
             }
             cf::CFRelease(space_arr as CFTypeRef);
+        }
+
+        // Hide borders on current spaces whose target windows are no longer here
+        // (they moved to another space)
+        let stale: Vec<WindowID> = self.borders.iter()
+            .filter(|(wid, border)| {
+                current_spaces.contains(&border.sid()) && !seen_wids.contains(wid)
+            })
+            .map(|(wid, _)| *wid)
+            .collect();
+        for wid in &stale {
+            if let Some(border) = self.borders.get(wid) {
+                border.hide();
+            }
         }
     }
 

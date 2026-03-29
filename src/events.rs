@@ -101,12 +101,12 @@ extern "C" {
 
 extern "C" fn event_port_callback(_port: CFTypeRef, _msg: *mut c_void, _size: isize, _ctx: *mut c_void) {
     unsafe {
-        let event = SLEventCreateNextEvent(GLOBAL_CID);
+        let mut event = SLEventCreateNextEvent(GLOBAL_CID);
         if event.is_null() { return; }
         loop {
             CFRelease(event);
-            let next = SLEventCreateNextEvent(GLOBAL_CID);
-            if next.is_null() { break; }
+            event = SLEventCreateNextEvent(GLOBAL_CID);
+            if event.is_null() { break; }
         }
     }
 }
