@@ -453,6 +453,9 @@ impl BorderWindow {
 impl Drop for BorderWindow {
     fn drop(&mut self) {
         trace!(wid = self.wid, "Destroying border window");
+        // Must hide (order out) before releasing — matches JB border_destroy.
+        // Without this, the SLS window can linger visually as a ghost border.
+        self.hide();
         unsafe { SLSReleaseWindow(self.cid, self.wid); }
     }
 }
