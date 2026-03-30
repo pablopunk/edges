@@ -2,8 +2,8 @@
 name = "edges"
 version = "0.1.0"
 edition = "2021"
-authors = ["Pablo Punk"]
-description = "Lightweight window borders for macOS"
+authors = ["Pablo Varela"]
+description = "Lightweight window edges for macOS"
 license = "MIT"
 repository = "https://github.com/pablopunk/edges"
 keywords = ["macos", "window-manager", "borders", "tiling"]

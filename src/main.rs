@@ -1,7 +1,10 @@
 use anyhow::Result;
 use clap::Parser;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tracing::{info, warn};
+
+static DUMP_REQUESTED: AtomicBool = AtomicBool::new(false);
 
 mod border;
 mod events;
@@ -100,6 +103,11 @@ fn main() -> Result<()> {
         std::process::exit(0);
     }).expect("Error setting Ctrl-C handler");
 
+    // SIGUSR1 dumps border count + memory info
+    unsafe {
+        libc::signal(libc::SIGUSR1, sigusr1_handler as libc::sighandler_t);
+    }
+
     info!("Edges is running. Press Ctrl+C to stop.");
 
     // Enter event loop (blocks forever)
@@ -112,7 +120,14 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+extern "C" fn sigusr1_handler(_: libc::c_int) {
+    DUMP_REQUESTED.store(true, Ordering::Relaxed);
+}
+
 fn handle_event(wm: &mut WindowManager, event: WindowEvent) {
+    if DUMP_REQUESTED.swap(false, Ordering::Relaxed) {
+        wm.dump_stats();
+    }
     use WindowEvent::*;
     match event {
         Created(wid, sid)    => wm.window_created(wid, sid),
@@ -128,5 +143,6 @@ fn handle_event(wm: &mut WindowManager, event: WindowEvent) {
         WindowClose(wid)     => wm.window_closed(wid),
         SpaceChanged         => wm.space_changed(),
         FrontChanged         => wm.focus_changed(),
+        PeriodicCleanup      => wm.periodic_cleanup(),
     }
 }

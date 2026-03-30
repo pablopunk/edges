@@ -30,6 +30,7 @@ pub enum WindowEvent {
     WindowClose(WindowID),
     SpaceChanged,
     FrontChanged,
+    PeriodicCleanup,
 }
 
 // ── Global handler ───────────────────────────────────────────────────────────
@@ -97,6 +98,21 @@ extern "C" {
     fn CFRunLoopRun();
     fn CFRunLoopGetCurrent() -> CFRunLoopRef;
     fn CFRunLoopAddSource(rl: CFRunLoopRef, source: CFRunLoopSourceRef, mode: CFStringRef);
+    fn CFRunLoopAddTimer(rl: CFRunLoopRef, timer: CFTypeRef, mode: CFStringRef);
+    fn CFRunLoopTimerCreate(
+        alloc: CFTypeRef,
+        fire_date: f64,
+        interval: f64,
+        flags: u64,
+        order: i64,
+        callback: extern "C" fn(CFTypeRef),
+        context: *const c_void,
+    ) -> CFTypeRef;
+    fn CFAbsoluteTimeGetCurrent() -> f64;
+}
+
+extern "C" fn cleanup_timer_callback(_timer: CFTypeRef) {
+    dispatch(WindowEvent::PeriodicCleanup);
 }
 
 extern "C" fn event_port_callback(_port: CFTypeRef, _msg: *mut c_void, _size: isize, _ctx: *mut c_void) {
@@ -149,6 +165,18 @@ pub unsafe fn run_event_loop(cid: ConnectionID, handler: Box<dyn FnMut(WindowEve
         CFRelease(cf_mach_port);
         CFRelease(source as CFTypeRef);
     }
+
+    // Periodic cleanup timer — every 60s, dispatch a cleanup event
+    let timer = CFRunLoopTimerCreate(
+        std::ptr::null(),
+        CFAbsoluteTimeGetCurrent() + 60.0,
+        60.0, // interval
+        0, 0,
+        cleanup_timer_callback,
+        std::ptr::null(),
+    );
+    CFRunLoopAddTimer(CFRunLoopGetCurrent(), timer, kCFRunLoopDefaultMode);
+    CFRelease(timer);
 
     debug!("Entering CFRunLoop");
     CFRunLoopRun();

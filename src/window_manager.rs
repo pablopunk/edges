@@ -10,7 +10,7 @@ use core_foundation::base::CFTypeRef;
 use core_graphics::geometry::CGRect;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{debug, trace};
+use tracing::{debug, info, trace};
 
 // ── window_suitable (matches JB window.h exactly) ────────────────────────────
 
@@ -402,6 +402,33 @@ impl WindowManager {
             if SLSConnectionGetPID(owner_cid, &mut pid) != 0 { return false; }
             pid == self.our_pid
         }
+    }
+
+    /// Periodic cleanup — remove borders for windows that no longer exist
+    pub fn periodic_cleanup(&mut self) {
+        let before = self.borders.len();
+        self.cleanup_dead_borders();
+        let removed = before - self.borders.len();
+        if removed > 0 {
+            info!(removed, remaining = self.borders.len(), "Periodic cleanup");
+        }
+    }
+
+    /// Dump stats on SIGUSR1
+    pub fn dump_stats(&mut self) {
+        // Clean up dead borders first
+        self.cleanup_dead_borders();
+        let focused = self.borders.values().filter(|b| b.is_focused()).count();
+        let dead: Vec<WindowID> = self.borders.iter()
+            .filter(|(_, b)| !b.target_alive())
+            .map(|(wid, _)| *wid)
+            .collect();
+        info!(
+            borders = self.borders.len(),
+            focused,
+            stale = dead.len(),
+            "[SIGUSR1] Border stats"
+        );
     }
 
     fn update_notifications(&self) {

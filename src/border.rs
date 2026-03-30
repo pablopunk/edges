@@ -90,6 +90,8 @@ pub struct BorderWindow {
     needs_redraw: bool,
     too_small: bool,
     settings: Arc<Settings>,
+    /// Cached CGContext for drawing (created once, reused)
+    context_ptr: *mut libc::c_void,
 }
 
 impl BorderWindow {
@@ -161,6 +163,14 @@ impl BorderWindow {
             cf::CFRelease(arr as CFTypeRef);
         }
 
+        // Create the CGContext once and cache it (matching JB: border->context = SLWindowContextCreate)
+        let context_ptr = unsafe { SLWindowContextCreate(cid, wid, std::ptr::null()) };
+        if context_ptr.is_null() {
+            // Clean up the window we just created
+            unsafe { SLSReleaseWindow(cid, wid); }
+            anyhow::bail!("SLWindowContextCreate returned null");
+        }
+
         debug!(wid, target_wid, radius, "Border window created");
 
         let mut border = Self {
@@ -177,6 +187,7 @@ impl BorderWindow {
             needs_redraw: true,
             too_small,
             settings,
+            context_ptr,
         };
 
         if !too_small {
@@ -371,11 +382,10 @@ impl BorderWindow {
 
         let color = self.current_color();
 
-        let ctx_ptr = unsafe { SLWindowContextCreate(self.cid, self.wid, std::ptr::null()) };
-        if ctx_ptr.is_null() {
-            anyhow::bail!("SLWindowContextCreate returned null");
+        if self.context_ptr.is_null() {
+            anyhow::bail!("Cached CGContext is null");
         }
-        let context = unsafe { core_graphics::context::CGContext::from_ptr(ctx_ptr as *mut _) };
+        let context = unsafe { core_graphics::context::CGContext::from_ptr(self.context_ptr as *mut _) };
 
         let renderer = BorderRenderer::new()?;
         renderer.draw_border(
@@ -456,6 +466,14 @@ impl Drop for BorderWindow {
         // Must hide (order out) before releasing — matches JB border_destroy.
         // Without this, the SLS window can linger visually as a ghost border.
         self.hide();
+        // Release the cached CGContext before destroying the window
+        if !self.context_ptr.is_null() {
+            unsafe {
+                extern "C" { fn CGContextRelease(ctx: *mut c_void); }
+                CGContextRelease(self.context_ptr);
+            }
+            self.context_ptr = std::ptr::null_mut();
+        }
         unsafe { SLSReleaseWindow(self.cid, self.wid); }
     }
 }

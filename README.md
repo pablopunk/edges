@@ -62,6 +62,18 @@ brew services stop edges    # stop
 brew services restart edges # restart after config changes
 ```
 
+## Memory footprint
+
+Edges is designed to be lightweight. Memory scales with the number of open windows and is fully reclaimed when windows close:
+
+| Open windows | Footprint |
+|--------------|-----------|
+| 5            | ~70 MB    |
+| 10           | ~85 MB    |
+| 20           | ~100 MB   |
+
+Most of the memory is macOS CoreAnimation backing stores for the overlay windows — the process's own heap usage is under 20 MB.
+
 ## Requirements
 
 - macOS 14.0+
